@@ -1,0 +1,13 @@
+[Unit]
+Description=Sui Node
+
+[Service]
+User={{USER}}
+WorkingDirectory={{WORK_DIRECTORY}}
+Environment=RUST_BACKTRACE=1
+Environment=RUST_LOG=info,sui_core=debug,narwhal=debug,narwhal-primary::helper=info
+ExecStart={{WORK_DIRECTORY}}/sui-node --config-path {{CONFIG_PATH}}
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
