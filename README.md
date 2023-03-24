@@ -10,6 +10,8 @@ To use the helper script in this repository, simply download the script and run 
 
 ![image](https://user-images.githubusercontent.com/111706151/227618895-87facdfe-02e3-406b-9c75-55ae0539c9e3.png)
 
+![image](https://user-images.githubusercontent.com/111706151/227619034-caf9a2b4-5d5c-4e60-a319-b1f75eeec0e2.png)
+
 
 ## Requirements
 
