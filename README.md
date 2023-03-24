@@ -6,6 +6,9 @@ This GitHub repository contains a Bash script that automates the process of sett
 
 To use the helper script in this repository, simply download the script and run it on your system. The script will guide you through the process of setting up and updating your SUI blockchain node.
 
+![image](https://user-images.githubusercontent.com/111706151/227618577-162c8aca-5a96-4fa9-a23b-93e4984d0e82.png)
+
+
 ## Requirements
 
 - curl to download required files.
