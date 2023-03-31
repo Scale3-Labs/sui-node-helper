@@ -16,7 +16,7 @@ CLI_NAME="sui"
 TMP_FOLDER="/tmp/sui-node-helper"
 
 GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/testnet/genesis.blob"
-SERVICE_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/genesis.blob"
+SERVICE_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/sui-node.service"
 VALIDATOR_CONFIG_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/validator.yaml"
 CLIENT_CONFIG_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/validator.yaml"
 
