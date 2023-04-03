@@ -1,0 +1,11 @@
+---
+keystore:
+  File: {{HOME_DIRECTORY}}/.sui/sui_config/sui.keystore
+envs:
+  - alias: testnet
+    rpc: "https://sui-api.rpcpool.com:443"
+    ws: ~
+  - alias: sui_scan
+    rpc: "https://rpc-testnet.suiscan.xyz:443"
+    ws: ~
+active_env: sui_scan

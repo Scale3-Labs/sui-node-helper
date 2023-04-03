@@ -7,27 +7,27 @@ DEFAULT_FLAGS="--clear --no-cancel"
 SUI_RELEASE="testnet"   # can be github release tag, branch, or commit hash
 DEFAULT_BINARY_DIR="$(echo ~)/sui"
 SUI_RELEASE_OS="sui-node-ubuntu23"
+SUI_NETWORK="testnet"
 
 BINARY_NAME="sui-node"
 CLI_NAME="sui"
 
-GENESIS_BLOB_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/genesis.blob"
-SERVICE_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/genesis.blob"
+# to store temporary files
+TMP_FOLDER="/tmp/sui-node-helper"
+
+GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/testnet/genesis.blob"
+SERVICE_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/sui-node.service"
 VALIDATOR_CONFIG_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/validator.yaml"
+CLIENT_CONFIG_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/client.yaml"
 
 SUI_SERVICE_PATH="/etc/systemd/system/sui-node.service"
-CLIENT_CONFIG='keystore:
-  File: sui.keystore
-envs:
-  - alias: testnet
-    rpc: "https://wave3-rpc.testnet.sui.io:443"
-    ws: ~
-active_env: testnet'
+CLIENT_CONFIG_PATH="$(echo ~)/.sui/sui_config/client.yaml"
 
 function setup_cancelled {
     dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
         --pause "User aborted, exiting..." 10 40 5
     clear
+    rm -rf $TMP_FOLDER
     exit 1
 }
 
@@ -41,6 +41,7 @@ function download_failed {
     dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
         --pause "Failed to download, probably required release does not currently exists in Scale3Labs repository. Exiting..." 0 0 7
     clear
+    rm -rf $TMP_FOLDER
     exit 1
 }
 
@@ -48,7 +49,18 @@ function not_available {
     dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
         --pause "feature currently not available, exiting..." 10 40 5
     clear
+    rm -rf $TMP_FOLDER
     exit 1
+}
+
+function show_continue_option {
+    dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
+    --title "Continue?" \
+    --yesno "Do you want to go back to main menu?" 0 0
+    if [ $? -ne 0 ]; then
+        setup_cancelled
+    fi
+    show_node_choices
 }
 
 function verify_server {
@@ -93,8 +105,9 @@ function verify_server {
 }
 
 function show_node_choices {
-    choice=$(dialog $DEFAULT_FLAGS --title "Node Type" \
+    choice=$(dialog $DEFAULT_FLAGS \
         --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Node Type" \
         --menu "Choose your choice of node:" 15 55 5 \
             1 "Validator Node" \
             2 "RPC Node (coming soon...)" \
@@ -103,19 +116,22 @@ function show_node_choices {
 }
 
 function validator_flow_choice {
-    choice=$(dialog $DEFAULT_FLAGS --title "Validator Node Options" \
+    choice=$(dialog $DEFAULT_FLAGS \
         --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Validator Node Options" \
         --menu "What do you want to do?" 15 55 5 \
             1 "Setup Validator From Scratch" \
             2 "Update Validator Version" \
-            3 "Wipe Database (coming soon...)" \
+            3 "Perform Validator Operations" \
+            4 "Wipe Database (coming soon...)" \
             4 "Exit" \
             2>&1 >/dev/tty)
     
     case $choice in
         1) setup_validator_node_flow;;
         2) update_validator_node_flow;;
-        3) not_available;;
+        3) validator_operations_flow;;
+        4) not_available;;
         4) setup_cancelled;;
         *) setup_cancelled;;
     esac
@@ -137,9 +153,23 @@ function update_validator_node_flow {
 
     # Validator update sequence
     get_sui_release
+    stop_sui_node
     download_binary
     verify_binary
     restart_sui_node
+}
+
+function validator_operations_flow {
+    IFS=$'\n' read -r -d '' sui_path < <( dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" --stdout --title "SUI PATH" \
+        --form "Operations require having SUI client on the server.\n\nenter directory path to sui client\n- Once entered press Yes to continue.\n- Select 'Cancle' to exit:" 0 0 0 \
+        "SUI_FOLDER_PATH:"         1 1 "$(echo ~)/sui" 1 40 80 0
+    )
+    # If user presses Cancle
+    if [ -z "$sui_path" ]; then
+        setup_cancelled
+    fi
+    DEFAULT_BINARY_DIR=$sui_path
+    show_supported_validator_operations
 }
 
 function setup_rpc_node_flow {
@@ -147,8 +177,9 @@ function setup_rpc_node_flow {
 }
 
 function get_sui_release {
-    binary_form=$(dialog $DEFAULT_FLAGS --title "Download Binary & CLI" \
+    binary_form=$(dialog $DEFAULT_FLAGS \
         --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Download Binary & CLI" \
         --form "Enter release details: \n\nPress 'OK' to download:" 0 0 5 \
         "Release version or hash:" 1 1 "testnet" 1 30 60 0 \
         "Absolute folder for data:" 2 1 "$DEFAULT_BINARY_DIR" 2 30 20 0 \
@@ -190,8 +221,11 @@ function verify_binary {
 }
 
 function initialize_client {
+
     # Download genesis blob
+    set -e
     curl --fail --progress-bar $GENESIS_BLOB_URL --output $DEFAULT_BINARY_DIR/genesis.blob
+    set +e
 
     dialog $DEFAULT_FLAGS \
         --backtitle "$DEFAULT_BACKTITLE" \
@@ -206,31 +240,47 @@ function initialize_client {
     mkdir -p ~/.sui/sui_config/     # Ensure folder is created
     $DEFAULT_BINARY_DIR/$CLI_NAME --version
     $DEFAULT_BINARY_DIR/$CLI_NAME client -y
-    echo "$CLIENT_CONFIG" > ~/.sui/sui_config/client.yaml
-    chmod 644 ~/.sui/sui_config/client.yaml
+    echo "$CLIENT_CONFIG" > $TMP_FOLDER/client.yaml
+    curl --fail --progress-bar $CLIENT_CONFIG_URL --output $TMP_FOLDER/client.yaml
+    cat ~/.sui/sui_config/client.yaml | grep active_address >> $TMP_FOLDER/client.yaml
+    sed -i "s|{{HOME_DIRECTORY}}|$(echo ~)|g;" $TMP_FOLDER/client.yaml
+
+    dialog $DEFAULT_FLAGS \
+        --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Verify the client.yaml config. Press OK to proceed or ESC to abort." \
+        --editbox $TMP_FOLDER/client.yaml 0 0 2>$TMP_FOLDER/updatedclient.yaml
+    if [ $? -ne 0 ]; then
+        setup_cancelled
+    fi
+    cp $TMP_FOLDER/updatedclient.yaml $CLIENT_CONFIG_PATH
+    chmod 644 $CLIENT_CONFIG_PATH
     KEY_BYTES=$(sed -e 's/[][]//g' -e 's/"//g' -e 's/,//g' ~/.sui/sui_config/sui.keystore)
 
     $DEFAULT_BINARY_DIR/$CLI_NAME keytool unpack $KEY_BYTES
-    $DEFAULT_BINARY_DIR/$CLI_NAME client new-address ed25519
-    dialog $DEFAULT_FLAGS --title "Client Initialized" --pause "Config & keystore generated at path $DEFAULT_BINARY_DIR/ and ~/.sui/ " 10 50 3
+    $DEFAULT_BINARY_DIR/$CLI_NAME client new-address ed25519 >> $TMP_FOLDER/wallet_recovery.txt
+    dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Wallet Recovery Phrase: Please note down the recovery phrase" --textbox $TMP_FOLDER/wallet_recovery.txt 0 0
+    dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Client Initialized" --pause "Config & keystore generated at path $DEFAULT_BINARY_DIR/ and ~/.sui/ " 10 50 3
 }
 
 function validator_info {
-    IFS=$'\n' read -r -d '' name description image_url project_url hostname gas_price < <( dialog $DEFAULT_FLAGS --stdout --title "Validator Information" \
-        --form "This information is about your project.\nWARNING: do not keep any fields blank, just add '-' or '.' for empty fields.\n\nEnter your details:" 0 0 0 \
-        "VALIDATOR_NAME:"         1 1 "SUI" 1 20 150 0 \
-        "VALIDATOR_DESCRIPTION:"  2 1 "SUI Validator Node description" 2 20 150 0 \
-        "LOGO_IMAGE_URL:"    3 1 "https://twitter.com/SuiNetwork/photo" 3 20 150 0 \
-        "PROJECT_URL:"  4 1 "https://sui.io/" 4 20 150 0 \
-        "HOST_IP_OR_DNS:"    5 1 "$HOSTNAME" 5 20 150 0 \
-        "GAS_PRICE:"    6 1 "1" 6 20 150 0)
-    
-    # if [ $? -ne 0 ]; then
-    #     # Handle when user presses ESC
-    #     setup_cancelled
-    # fi
+    IFS=$'\n' read -r -d '' name description image_url project_url hostname gas_price < <( dialog $DEFAULT_FLAGS \
+        --backtitle "$DEFAULT_BACKTITLE" \
+        --stdout --title "Validator Information" \
+        --form "This information is about your project.\nWARNING: Hyphen '-' is automatically added for empty fields.\n\nEnter your details:" 0 0 0 \
+        "VALIDATOR_NAME:"         1 1 "SUI" 1 40 150 0 \
+        "VALIDATOR_DESCRIPTION:"  2 1 "SUI Validator Node description" 2 40 150 0 \
+        "LOGO_IMAGE_URL:"    3 1 "https://twitter.com/SuiNetwork/photo" 3 40 150 0 \
+        "PROJECT_URL:"  4 1 "https://sui.io/" 4 40 150 0 \
+        "HOST_IP_OR_DNS:"    5 1 "$HOSTNAME" 5 40 150 0 \
+        "GAS_PRICE:"    6 1 "1" 6 40 150 0)
 
-    # if fields are kept empty by user, set default value to `-`
+    # Handle when user presses ESC
+    if [ -z "$name" ] && [ -z "$description" ] && [ -z "$image_url" ] && [ -z "$project_url" ] && [ -z "$hostname" ] && [ -z "$gas_price" ]; then
+        setup_cancelled
+    fi
+    # if some fields are kept empty by user, set default value to `-`
     if [ -z "$name" ]; then
         name="-"
     fi
@@ -256,9 +306,28 @@ function validator_info {
 }
 
 function setup_sui_service {
+    dialog $DEFAULT_FLAGS \
+        --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Setup Systemd Service for SUI" \
+        --msgbox "Proceed to setup sui-node service?" 0 0
+    if [ $? -ne 0 ]; then
+        setup_cancelled
+    fi
+
+    IFS=$'\n' read -r -d '' data_folder_path < <( dialog $DEFAULT_FLAGS \
+        --backtitle "$DEFAULT_BACKTITLE" \
+        --stdout --title "SUI Data Folder" \
+        --form "Enter absolute path to folder where you want to store SUI blochchain data\n\nPress 'OK' to continue:" 0 0 0 \
+        "DATA_FOLDER_PATH:"         1 1 "$(echo ~)/sui" 1 40 80 0
+    )
+    # If user presses Cancle
+    if [ -z "$data_folder_path" ]; then
+        setup_cancelled
+    fi
 
     curl -s $VALIDATOR_CONFIG_TEMPLATE_URL --output $DEFAULT_BINARY_DIR/validator.yaml
-    sed -i "s|{{BINARY_PATH}}|$DEFAULT_BINARY_DIR|g; s|{{DNS_NAME}}|$hostname|g" $DEFAULT_BINARY_DIR/validator.yaml
+    mkdir -p $data_folder_path/db/authorities_db $data_folder_path/db/authorities_db
+    sed -i "s|{{BINARY_PATH}}|$DEFAULT_BINARY_DIR|g; s|{{DNS_NAME}}|$hostname|g; s|{{DATA_FOLDER}}|$data_folder_path|g" $DEFAULT_BINARY_DIR/validator.yaml
     
     # requires root permissions
     sudo curl -s $SERVICE_TEMPLATE_URL --output $SUI_SERVICE_PATH
@@ -272,9 +341,26 @@ function setup_sui_service {
     mkdir -p $DEFAULT_BINARY_DIR/db/authorities_db $DEFAULT_BINARY_DIR/db/consensus_db
 
     systemctl --user enable $SUI_SERVICE_PATH
+    dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Completed" --pause "SUI service setup completed at path $SUI_SERVICE_PATH" 10 50 5
 
-    dialog $DEFAULT_FLAGS --title "Completed" --pause "SUI service setup completed at path $SUI_SERVICE_PATH" 10 50 5
+}
 
+function stop_sui_node {
+    dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Stop SUI node" \
+        --yesno "Update requires stopping SUI node?\n\nThis will run 'sudo systemctl stop sui-node'.\n\n\nPress 'Yes' to restart or 'No' to cancle." 0 0
+    
+    if [ $? -ne 0 ]; then
+        setup_cancelled
+    fi
+    sudo systemctl stop sui-node
+    if [ $? -ne 0 ]; then
+        setup_failed
+    fi
+
+    dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
+        --title "SUI Stopped" --pause "SUI node stopped." 10 50 5
 }
 
 function restart_sui_node {
@@ -297,7 +383,6 @@ function restart_sui_node {
         --title "Validator Updated" \
         --msgbox "Validator has been updated.\nPlease check the validator logs using the command:\n\n   journalctl -fu sui-node" 0 0
     clear
-
 }
 
 function post_validator_setup_instructions {
@@ -308,6 +393,98 @@ function post_validator_setup_instructions {
     clear
 }
 
+function show_supported_validator_operations {
+    choice=$(dialog $DEFAULT_FLAGS --title "Validator Operations" \
+        --backtitle "$DEFAULT_BACKTITLE" \
+        --menu "What action do you want to perform on validator?" 15 55 5 \
+            1 "Rename Validator(Alpha)" \
+            2 "Become Candidate" \
+            3 "Join Committee" \
+            4 "Update Description (coming soon...)" \
+            5 "Wipe Database (coming soon...)" \
+            6 "Exit" \
+            2>&1 >/dev/tty)
+    
+    case $choice in
+        1) rename_validator;;
+        2) become_candidate_validator;;
+        3) join_committee_validator;;
+        4) not_available;;
+        5) not_available;;
+        6) setup_cancelled;;
+        *) setup_cancelled;;
+    esac
+}
+
+function rename_validator {
+    IFS=$'\n' read -r -d '' new_name gas < <( dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
+        --stdout --title "validator.info file path" \
+        --form "Enter New Validator Name?\n\n\nNOTE: Renaming is a Transaction on network and requires wallet balance\n\nSelect 'Cancle' to abort!" 0 0 0 \
+        "NEW_VALIDATOR_NAME:"         1 1 "$HOSTNAME" 1 40 80 0 \
+        "GAS:"                         2 1 "1000" 2 40 80 0
+    )
+
+    sui client call --package 0x2 --module sui_system --function update_validator_name --args 0x5 \"$new_name\" --gas-budget $gas
+}
+
+function become_candidate_validator {
+    IFS=$'\n' read -r -d '' validator_file_path < <( dialog $DEFAULT_FLAGS \
+        --backtitle "$DEFAULT_BACKTITLE" \
+        --stdout --title "validator.info file path" \
+        --form "Is validator info file already created?\n\nNOTE: make sure you have enough funds to run this command.\n\n   If 'Yes' enter path for validator.info file to become candidate\n Select 'Cancle' to create a validator.info file:" 0 0 0 \
+        "FILE_PATH:"         1 1 "$(echo ~)/sui" 1 40 150 0
+    )
+    # If user presses Cancle
+    if [ -z "$validator_file_path" ]; then
+        validator_info
+    fi
+    # Verify file existance
+    if [ -d "$validator_file_path" ]; then
+        if [ -e "$validator_file_path"/validator.info ]; then
+                validator_file_path="$validator_file_path"/validator.info
+                dialog $DEFAULT_FLAGS \
+                    --backtitle "$DEFAULT_BACKTITLE" \
+                    --title "validator.info found!!!" --textbox $validator_file_path 0 0
+        fi
+    elif [ -f "$validator_file_path" ]; then
+        dialog $DEFAULT_FLAGS \
+            --backtitle "$DEFAULT_BACKTITLE" \
+            --title "validator.info found" --textbox $validator_file_path 0 0
+    else
+        dialog $DEFAULT_FLAGS \
+            --backtitle "$DEFAULT_BACKTITLE" \
+            --title "File Not Found" \
+            --yesno "Could not find file in provided path\n\n\nDo you want to proceed to create new validator.info file?" 0 0
+        if [ $? -ne 0 ]; then
+            setup_cancelled
+        fi
+        validator_info
+    fi
+    cd $DEFAULT_BINARY_DIR/
+    $DEFAULT_BINARY_DIR/$CLI_NAME validator become-candidate validator.info 2>&1 | dialog $DEFAULT_FLAGS \
+        --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Become Candidate Output" \
+        --programbox 30 100
+
+    show_continue_option
+}
+
+function join_committee_validator {
+    dialog $DEFAULT_FLAGS \
+        --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Join Validator Committee?" \
+        --yesno "WARNING: When you officially join the committee but node is not fully up-to-date (not fully synced), you cannot make meaningful contribution to the network and may be subject to peer reporting hence face the risk of reduced staking rewards for you and your delegators. \n\n\nProceed to join?" 0 0
+    if [ $? -ne 0 ]; then
+        setup_cancelled
+    fi
+
+    $DEFAULT_BINARY_DIR/$CLI_NAME validator join-committee 2>&1 | dialog $DEFAULT_FLAGS \
+        --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Join Committee Output" \
+        --programbox 30 100
+
+    show_continue_option
+}
 
 # STEP 0: Prerequisites
 if ! command -v curl >/dev/null 2>&1; then
@@ -336,6 +513,9 @@ fi
 # END STEP 0
 
 # STEP 1: Proceed with Installation
+# make sure to create tmp folder and it is empty
+rm -rf $TMP_FOLDER && mkdir -p $TMP_FOLDER
+
 dialog $DEFAULT_FLAGS \
     --backtitle "$DEFAULT_BACKTITLE" \
     --title "This is a SUI node installer which will help you setup validator and full node." \
@@ -371,3 +551,5 @@ case $choice in
     *) setup_cancelled;;
 esac
 # END STEP 2
+
+rm -rf $TMP_FOLDER
