@@ -158,6 +158,7 @@ function setup_validator_node_flow {
     initialize_validator_client
     validator_info
     setup_sui_service
+    validator_instructions
     post_node_setup_instructions
 }
 
@@ -218,6 +219,7 @@ function setup_fullnode_node_flow {
     verify_binary
     download_genesis
     setup_sui_service
+    restart_sui_node
     post_node_setup_instructions
 }
 
@@ -468,6 +470,13 @@ function restart_sui_node {
         --title "Validator Updated" \
         --msgbox "Validator has been updated.\nPlease check the validator logs using the command:\n\n   journalctl -fu sui-node" 0 0
     clear
+}
+
+function validator_instructions {
+    dialog $DEFAULT_FLAGS \
+        --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Validator Warning" \
+        --infobox "Participating in SUI network as validator requires SUI tokens.\nSo please make sure you have enough SUI on your validator address.\n\nOnce you have enough funds you can use this tool to make your validator a candidate and join validator comittee." 0 0
 }
 
 function post_node_setup_instructions {
