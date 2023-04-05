@@ -7,7 +7,10 @@ DEFAULT_FLAGS="--clear --no-cancel"
 SUI_RELEASE="testnet"   # can be github release tag, branch, or commit hash
 DEFAULT_BINARY_DIR="$(echo ~)/sui"
 SUI_RELEASE_OS="sui-node-ubuntu23"
-SUI_NETWORK="testnet"
+SUI_NETWORK="testnet"   # this can be either devnet or testnet
+NODE_TYPE="fullnode"    # this can be either fullnode or validator
+CONFIG_TEMPLATE_URL=""  # set to $FULLNODE_CONFIG_TEMPLATE_URL or $VALIDATOR_CONFIG_TEMPLATE_URL based on choice
+CONFIG_FILE_NAME=""     # set to 'fullnode.yaml' or 'validator.yaml' based on choice
 
 BINARY_NAME="sui-node"
 CLI_NAME="sui"
@@ -15,10 +18,13 @@ CLI_NAME="sui"
 # to store temporary files
 TMP_FOLDER="/tmp/sui-node-helper"
 
+TESTNET_GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/testnet/genesis.blob"
+DEVNET_GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/devnet/genesis.blob"
 GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/testnet/genesis.blob"
 SERVICE_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/sui-node.service"
 VALIDATOR_CONFIG_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/validator.yaml"
 CLIENT_CONFIG_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/client.yaml"
+FULLNODE_CONFIG_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/fullnode.yaml"
 
 SUI_SERVICE_PATH="/etc/systemd/system/sui-node.service"
 CLIENT_CONFIG_PATH="$(echo ~)/.sui/sui_config/client.yaml"
@@ -110,12 +116,16 @@ function show_node_choices {
         --title "Node Type" \
         --menu "Choose your choice of node:" 15 55 5 \
             1 "Validator Node" \
-            2 "RPC Node (coming soon...)" \
+            2 "RPC Full Node" \
             3 "Exit" \
             2>&1 >/dev/tty)
 }
 
 function validator_flow_choice {
+    NODE_TYPE="validator"
+    CONFIG_FILE_NAME="validator.yaml"
+    CONFIG_TEMPLATE_URL=$VALIDATOR_CONFIG_TEMPLATE_URL
+
     choice=$(dialog $DEFAULT_FLAGS \
         --backtitle "$DEFAULT_BACKTITLE" \
         --title "Validator Node Options" \
@@ -124,7 +134,7 @@ function validator_flow_choice {
             2 "Update Validator Version" \
             3 "Perform Validator Operations" \
             4 "Wipe Database (coming soon...)" \
-            4 "Exit" \
+            5 "Exit" \
             2>&1 >/dev/tty)
     
     case $choice in
@@ -132,7 +142,7 @@ function validator_flow_choice {
         2) update_validator_node_flow;;
         3) validator_operations_flow;;
         4) not_available;;
-        4) setup_cancelled;;
+        5) setup_cancelled;;
         *) setup_cancelled;;
     esac
 }
@@ -140,23 +150,26 @@ function validator_flow_choice {
 function setup_validator_node_flow {
 
     # Validator Setup Sequence
+    select_network
     get_sui_release
     download_binary
     verify_binary
-    initialize_client
+    download_genesis
+    initialize_validator_client
     validator_info
     setup_sui_service
-    post_validator_setup_instructions
+    validator_instructions
+    post_node_setup_instructions
 }
 
 function update_validator_node_flow {
-
     # Validator update sequence
     get_sui_release
     stop_sui_node
     download_binary
     verify_binary
     restart_sui_node
+    show_continue_option
 }
 
 function validator_operations_flow {
@@ -172,8 +185,73 @@ function validator_operations_flow {
     show_supported_validator_operations
 }
 
-function setup_rpc_node_flow {
-    not_available
+function fullnode_flow_choice {
+    NODE_TYPE="fullnode"
+    CONFIG_FILE_NAME="fullnode.yaml"
+    CONFIG_TEMPLATE_URL=$FULLNODE_CONFIG_TEMPLATE_URL
+
+    choice=$(dialog $DEFAULT_FLAGS \
+    --backtitle "$DEFAULT_BACKTITLE" \
+    --title "FullNode Options" \
+    --menu "What do you want to do?" 15 55 5 \
+        1 "Setup FullNode From Scratch" \
+        2 "Update FullNode Version" \
+        3 "Setup FullNode with Indexer (coming soon...)" \
+        4 "Wipe Database (coming soon...)" \
+        5 "Exit" \
+        2>&1 >/dev/tty)
+
+    case $choice in
+        1) setup_fullnode_node_flow;;
+        2) update_fullnode_node_flow;;
+        3) not_available;;
+        4) not_available;;
+        5) setup_cancelled;;
+        *) setup_cancelled;;
+    esac
+}
+
+function setup_fullnode_node_flow {
+    # Fullnode Setup Sequence
+    select_network
+    get_sui_release
+    download_binary
+    verify_binary
+    download_genesis
+    setup_sui_service
+    restart_sui_node
+    post_node_setup_instructions
+}
+
+function update_fullnode_node_flow {
+    # Fullnode update sequence
+    get_sui_release
+    stop_sui_node
+    download_binary
+    verify_binary
+    restart_sui_node
+    show_continue_option
+}
+
+function select_network {
+   choice=$(dialog $DEFAULT_FLAGS \
+    --backtitle "$DEFAULT_BACKTITLE" \
+    --title "Select Network" \
+    --menu "Setup FullNode for Network." 15 55 5 \
+        1 "Testnet" \
+        2 "Devnet" \
+        3 "Exit" \
+        2>&1 >/dev/tty)
+    
+    case $choice in
+        1)  SUI_NETWORK="testnet"
+            GENESIS_BLOB_URL=$TESTNET_GENESIS_BLOB_URL
+            ;;
+        2)  SUI_NETWORK="devnet"
+            GENESIS_BLOB_URL=$DEVNET_GENESIS_BLOB_URL
+            ;;
+        *) setup_cancelled;;
+    esac
 }
 
 function get_sui_release {
@@ -182,7 +260,7 @@ function get_sui_release {
         --title "Download Binary & CLI" \
         --form "Enter release details: \n\nPress 'OK' to download:" 0 0 5 \
         "Release version or hash:" 1 1 "testnet" 1 30 60 0 \
-        "Absolute folder for data:" 2 1 "$DEFAULT_BINARY_DIR" 2 30 20 0 \
+        "Absolute folder for configs:" 2 1 "$DEFAULT_BINARY_DIR" 2 30 20 0 \
         2>&1 >/dev/tty)
 
     if [ $? -ne 0 ]; then
@@ -220,12 +298,14 @@ function verify_binary {
     $DEFAULT_BINARY_DIR/$BINARY_NAME --version | dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" --programbox "sui-node version" 10 40
 }
 
-function initialize_client {
-
+function download_genesis {
     # Download genesis blob
     set -e
     curl --fail --progress-bar $GENESIS_BLOB_URL --output $DEFAULT_BINARY_DIR/genesis.blob
     set +e
+}
+
+function initialize_validator_client {
 
     dialog $DEFAULT_FLAGS \
         --backtitle "$DEFAULT_BACKTITLE" \
@@ -240,19 +320,22 @@ function initialize_client {
     mkdir -p ~/.sui/sui_config/     # Ensure folder is created
     $DEFAULT_BINARY_DIR/$CLI_NAME --version
     $DEFAULT_BINARY_DIR/$CLI_NAME client -y
-    echo "$CLIENT_CONFIG" > $TMP_FOLDER/client.yaml
-    curl --fail --progress-bar $CLIENT_CONFIG_URL --output $TMP_FOLDER/client.yaml
-    cat ~/.sui/sui_config/client.yaml | grep active_address >> $TMP_FOLDER/client.yaml
-    sed -i "s|{{HOME_DIRECTORY}}|$(echo ~)|g;" $TMP_FOLDER/client.yaml
+    # Patch client.yaml if testnet
+    if [[ $SUI_NETWORK == "testnet" ]]; then
+        curl --fail --progress-bar $CLIENT_CONFIG_URL --output $TMP_FOLDER/client.yaml
+        cat ~/.sui/sui_config/client.yaml | grep active_address >> $TMP_FOLDER/client.yaml
+        sed -i "s|{{HOME_DIRECTORY}}|$(echo ~)|g;" $TMP_FOLDER/client.yaml
 
-    dialog $DEFAULT_FLAGS \
-        --backtitle "$DEFAULT_BACKTITLE" \
-        --title "Verify the client.yaml config. Press OK to proceed or ESC to abort." \
-        --editbox $TMP_FOLDER/client.yaml 0 0 2>$TMP_FOLDER/updatedclient.yaml
-    if [ $? -ne 0 ]; then
-        setup_cancelled
+        dialog $DEFAULT_FLAGS \
+            --backtitle "$DEFAULT_BACKTITLE" \
+            --title "Verify the client.yaml config. TAB to navigate, OK to proceed or ESC to abort." \
+            --editbox $TMP_FOLDER/client.yaml 0 0 2>$TMP_FOLDER/updatedclient.yaml
+        if [ $? -ne 0 ]; then
+            setup_cancelled
+        fi
+        cp $TMP_FOLDER/updatedclient.yaml $CLIENT_CONFIG_PATH
     fi
-    cp $TMP_FOLDER/updatedclient.yaml $CLIENT_CONFIG_PATH
+
     chmod 644 $CLIENT_CONFIG_PATH
     KEY_BYTES=$(sed -e 's/[][]//g' -e 's/"//g' -e 's/,//g' ~/.sui/sui_config/sui.keystore)
 
@@ -302,7 +385,7 @@ function validator_info {
     # Making sure we are in right directory
     cd $DEFAULT_BINARY_DIR/
     $DEFAULT_BINARY_DIR/$CLI_NAME validator make-validator-info "$name" "$description" "$image_url" "$project_url" "$hostname" "$gas_price"
-    
+
 }
 
 function setup_sui_service {
@@ -325,9 +408,9 @@ function setup_sui_service {
         setup_cancelled
     fi
 
-    curl -s $VALIDATOR_CONFIG_TEMPLATE_URL --output $DEFAULT_BINARY_DIR/validator.yaml
-    mkdir -p $data_folder_path/db/authorities_db $data_folder_path/db/authorities_db
-    sed -i "s|{{BINARY_PATH}}|$DEFAULT_BINARY_DIR|g; s|{{DNS_NAME}}|$hostname|g; s|{{DATA_FOLDER}}|$data_folder_path|g" $DEFAULT_BINARY_DIR/validator.yaml
+    curl -s $CONFIG_TEMPLATE_URL --output $DEFAULT_BINARY_DIR/$CONFIG_FILE_NAME
+
+    sed -i "s|{{BINARY_PATH}}|$DEFAULT_BINARY_DIR|g; s|{{DNS_NAME}}|$hostname|g; s|{{DATA_FOLDER}}|$data_folder_path|g" $DEFAULT_BINARY_DIR/$CONFIG_FILE_NAME
     
     # requires root permissions
     sudo curl -s $SERVICE_TEMPLATE_URL --output $SUI_SERVICE_PATH
@@ -335,10 +418,15 @@ function setup_sui_service {
         echo "unable to sudo"
         exit 1
     fi
-    sudo sed -i "s|{{WORK_DIRECTORY}}|$DEFAULT_BINARY_DIR|g; s|{{CONFIG_PATH}}|$DEFAULT_BINARY_DIR/validator.yaml|g; s|{{USER}}|$USER|g" $SUI_SERVICE_PATH
+    sudo sed -i "s|{{WORK_DIRECTORY}}|$DEFAULT_BINARY_DIR|g; s|{{CONFIG_PATH}}|$DEFAULT_BINARY_DIR/$CONFIG_FILE_NAME|g; s|{{USER}}|$USER|g" $SUI_SERVICE_PATH
 
     # create DB dirs
-    mkdir -p $DEFAULT_BINARY_DIR/db/authorities_db $DEFAULT_BINARY_DIR/db/consensus_db
+    if [[ $NODE_TYPE == "validator" ]]; then
+        sudo mkdir -p $data_folder_path/db/authorities_db $data_folder_path/db/authorities_db
+    else
+        sudo mkdir -p $data_folder_path/suidb
+    fi
+    sudo chown -R $USER $data_folder_path      # Make sure user has access to data dir
 
     systemctl --user enable $SUI_SERVICE_PATH
     dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
@@ -349,7 +437,7 @@ function setup_sui_service {
 function stop_sui_node {
     dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
         --title "Stop SUI node" \
-        --yesno "Update requires stopping SUI node?\n\nThis will run 'sudo systemctl stop sui-node'.\n\n\nPress 'Yes' to restart or 'No' to cancle." 0 0
+        --yesno "Update requires stopping SUI node.\n\nThis will run 'sudo systemctl stop sui-node'.\n\n\nPress 'Yes' to stop or 'No' to cancle." 0 0
     
     if [ $? -ne 0 ]; then
         setup_cancelled
@@ -380,16 +468,23 @@ function restart_sui_node {
 
     dialog $DEFAULT_FLAGS \
         --backtitle "$DEFAULT_BACKTITLE" \
-        --title "Validator Updated" \
-        --msgbox "Validator has been updated.\nPlease check the validator logs using the command:\n\n   journalctl -fu sui-node" 0 0
+        --title "Node Restarted" \
+        --msgbox "SUI service has been restarted.\nPlease check the sui-node service logs using the command:\n\n   journalctl -fu sui-node" 0 0
     clear
 }
 
-function post_validator_setup_instructions {
+function validator_instructions {
     dialog $DEFAULT_FLAGS \
         --backtitle "$DEFAULT_BACKTITLE" \
-        --title "Validator Setup Completed" \
-        --msgbox "Thank you for giving this project a try.\nIf you would like to monitor your node, visit scale3labs.com\n\n\n\nNow you can start the SUI node by running the following command:\n\n   sudo systemctl start sui-node\n\n\nTo check the logs of sui-node, run the following command:\n\n   journalctl -fu sui-node\n\n\n\n\nReferences:\nhttps://github.com/SuiExternal/sui-testnet-wave3/blob/main/validator_operations/join_committee.md\nhttps://github.com/MystenLabs/sui/blob/main/nre/systemd/README.md" 0 0
+        --title "Validator Warning" \
+        --infobox "Participating in SUI network as validator requires SUI tokens.\nSo please make sure you have enough SUI on your validator address.\n\nOnce you have enough funds you can use this tool to make your validator a candidate and join validator comittee." 0 0
+}
+
+function post_node_setup_instructions {
+    dialog $DEFAULT_FLAGS \
+        --backtitle "$DEFAULT_BACKTITLE" \
+        --title "Node Setup Completed" \
+        --msgbox "Thank you for giving this project a try.\nIf you would like to monitor your node, visit scale3labs.com\n\n\n\nNow you can start the SUI node by running the following command:\n\n   sudo systemctl start sui-node\n\n\nTo check the logs of sui-node, run the following command:\n\n   journalctl -fu sui-node\n\n\n\n\nReferences:\nhttps://github.com/MystenLabs/sui/blob/main/nre/systemd/README.md\nhttps://docs.sui.io/build/fullnode\nhttps://docs.sui.io/build/validator-node" 0 0
     clear
 }
 
@@ -534,7 +629,7 @@ verify_server
 dialog $DEFAULT_FLAGS \
     --backtitle "$DEFAULT_BACKTITLE" \
     --title "Instructions" \
-    --yesno "-> To abort the setup at any point in time, use Exit/No option or press ESC key. \n\n-> Use keyboard arrow keys to navigate. \n\nClick 'Yes' to continue." 0 0
+    --yesno "-> To abort the setup at any point in time, use Exit/No option or press ESC key. \n\n-> Use keyboard arrow keys & TAB to navigate. \n\nClick 'Yes' to continue." 0 0
 response=$?
 case $response in
    0) show_node_choices;;
@@ -546,7 +641,7 @@ esac
 # STEP 2: Node Choice and Flow
 case $choice in
     1) validator_flow_choice;;
-    2) setup_rpc_node_flow;;
+    2) fullnode_flow_choice;;
     3) setup_cancelled;;
     *) setup_cancelled;;
 esac
