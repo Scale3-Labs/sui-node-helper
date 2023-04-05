@@ -385,7 +385,7 @@ function validator_info {
     # Making sure we are in right directory
     cd $DEFAULT_BINARY_DIR/
     $DEFAULT_BINARY_DIR/$CLI_NAME validator make-validator-info "$name" "$description" "$image_url" "$project_url" "$hostname" "$gas_price"
-    
+
 }
 
 function setup_sui_service {
@@ -422,10 +422,11 @@ function setup_sui_service {
 
     # create DB dirs
     if [[ $NODE_TYPE == "validator" ]]; then
-        mkdir -p $data_folder_path/db/authorities_db $data_folder_path/db/authorities_db
+        sudo mkdir -p $data_folder_path/db/authorities_db $data_folder_path/db/authorities_db
     else
-        mkdir -p $data_folder_path/suidb
+        sudo mkdir -p $data_folder_path/suidb
     fi
+    sudo chown -R $USER $data_folder_path      # Make sure user has access to data dir
 
     systemctl --user enable $SUI_SERVICE_PATH
     dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
@@ -467,8 +468,8 @@ function restart_sui_node {
 
     dialog $DEFAULT_FLAGS \
         --backtitle "$DEFAULT_BACKTITLE" \
-        --title "Validator Updated" \
-        --msgbox "Validator has been updated.\nPlease check the validator logs using the command:\n\n   journalctl -fu sui-node" 0 0
+        --title "Node Restarted" \
+        --msgbox "SUI service has been restarted.\nPlease check the sui-node service logs using the command:\n\n   journalctl -fu sui-node" 0 0
     clear
 }
 
