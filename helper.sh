@@ -174,10 +174,10 @@ function update_validator_node_flow {
 
 function validator_operations_flow {
     IFS=$'\n' read -r -d '' sui_path < <( dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" --stdout --title "SUI PATH" \
-        --form "Operations require having SUI client on the server.\n\nenter directory path to sui client\n- Once entered press Yes to continue.\n- Select 'Cancle' to exit:" 0 0 0 \
+        --form "Operations require having SUI client on the server.\n\nenter directory path to sui client\n- Once entered press Yes to continue.\n- Select 'Cancel' to exit:" 0 0 0 \
         "SUI_FOLDER_PATH:"         1 1 "$(echo ~)/sui" 1 40 80 0
     )
-    # If user presses Cancle
+    # If user presses Cancel
     if [ -z "$sui_path" ]; then
         setup_cancelled
     fi
@@ -259,8 +259,8 @@ function get_sui_release {
         --backtitle "$DEFAULT_BACKTITLE" \
         --title "Download Binary & CLI" \
         --form "Enter release details: \n\nPress 'OK' to download:" 0 0 5 \
-        "Release version or hash:" 1 1 "testnet" 1 30 60 0 \
-        "Absolute folder for configs:" 2 1 "$DEFAULT_BINARY_DIR" 2 30 20 0 \
+        "Release version or hash:" 1 1 "testnet" 1 30 80 0 \
+        "Absolute folder for configs:" 2 1 "$DEFAULT_BINARY_DIR" 2 30 80 0 \
         2>&1 >/dev/tty)
 
     if [ $? -ne 0 ]; then
@@ -403,7 +403,7 @@ function setup_sui_service {
         --form "Enter absolute path to folder where you want to store SUI blochchain data\n\nPress 'OK' to continue:" 0 0 0 \
         "DATA_FOLDER_PATH:"         1 1 "$(echo ~)/sui" 1 40 80 0
     )
-    # If user presses Cancle
+    # If user presses Cancel
     if [ -z "$data_folder_path" ]; then
         setup_cancelled
     fi
@@ -437,7 +437,7 @@ function setup_sui_service {
 function stop_sui_node {
     dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
         --title "Stop SUI node" \
-        --yesno "Update requires stopping SUI node.\n\nThis will run 'sudo systemctl stop sui-node'.\n\n\nPress 'Yes' to stop or 'No' to cancle." 0 0
+        --yesno "Update requires stopping SUI node.\n\nThis will run 'sudo systemctl stop sui-node'.\n\n\nPress 'Yes' to stop or 'No' to cancel." 0 0
     
     if [ $? -ne 0 ]; then
         setup_cancelled
@@ -455,7 +455,7 @@ function restart_sui_node {
 
     dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
         --title "Restart SUI node" \
-        --yesno "Do you want to restart SUI node?\n\nThis will run 'sudo systemctl restart sui-node'.\n\n\nPress 'Yes' to restart or 'No' to cancle." 0 0
+        --yesno "Do you want to restart SUI node?\n\nThis will run 'sudo systemctl restart sui-node'.\n\n\nPress 'Yes' to restart or 'No' to cancel." 0 0
     
     if [ $? -ne 0 ]; then
         setup_cancelled
@@ -514,7 +514,7 @@ function show_supported_validator_operations {
 function rename_validator {
     IFS=$'\n' read -r -d '' new_name gas < <( dialog $DEFAULT_FLAGS --backtitle "$DEFAULT_BACKTITLE" \
         --stdout --title "validator.info file path" \
-        --form "Enter New Validator Name?\n\n\nNOTE: Renaming is a Transaction on network and requires wallet balance\n\nSelect 'Cancle' to abort!" 0 0 0 \
+        --form "Enter New Validator Name?\n\n\nNOTE: Renaming is a Transaction on network and requires wallet balance\n\nSelect 'Cancel' to abort!" 0 0 0 \
         "NEW_VALIDATOR_NAME:"         1 1 "$HOSTNAME" 1 40 80 0 \
         "GAS:"                         2 1 "1000" 2 40 80 0
     )
@@ -526,10 +526,10 @@ function become_candidate_validator {
     IFS=$'\n' read -r -d '' validator_file_path < <( dialog $DEFAULT_FLAGS \
         --backtitle "$DEFAULT_BACKTITLE" \
         --stdout --title "validator.info file path" \
-        --form "Is validator info file already created?\n\nNOTE: make sure you have enough funds to run this command.\n\n   If 'Yes' enter path for validator.info file to become candidate\n Select 'Cancle' to create a validator.info file:" 0 0 0 \
+        --form "Is validator info file already created?\n\nNOTE: make sure you have enough funds to run this command.\n\n   If 'Yes' enter path for validator.info file to become candidate\n Select 'Cancel' to create a validator.info file:" 0 0 0 \
         "FILE_PATH:"         1 1 "$(echo ~)/sui" 1 40 150 0
     )
-    # If user presses Cancle
+    # If user presses Cancel
     if [ -z "$validator_file_path" ]; then
         validator_info
     fi
