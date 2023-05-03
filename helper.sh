@@ -18,8 +18,7 @@ CLI_NAME="sui"
 # to store temporary files
 TMP_FOLDER="/tmp/sui-node-helper"
 
-# MAINNET_GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/mainnet/genesis.blob"
-MAINNET_GENESIS_BLOB_URL="https://raw.githubusercontent.com/binary-comb/super-rotary-phone/main/genesis.blob"
+MAINNET_GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/mainnet/genesis.blob"
 TESTNET_GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/testnet/genesis.blob"
 DEVNET_GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/devnet/genesis.blob"
 SERVICE_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/sui-node.service"
@@ -283,7 +282,7 @@ function get_sui_release {
     SUI_RELEASE=$(echo "$binary_form" | head -n 1)
     DEFAULT_BINARY_DIR=$(echo "$binary_form" | tail -n 1)
     # Make sure the binary directory exists
-    mkdir -p $DEFAULT_BINARY_DIR
+    sudo mkdir -p $DEFAULT_BINARY_DIR
     sudo chown -R $USER $DEFAULT_BINARY_DIR 
     cd $DEFAULT_BINARY_DIR
 }
