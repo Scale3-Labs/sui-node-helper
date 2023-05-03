@@ -1,0 +1,29 @@
+db-path: {{DATA_FOLDER}}/suidb
+
+network-address: "/dns/localhost/tcp/8080/http"
+metrics-address: "0.0.0.0:9184"
+json-rpc-address: "0.0.0.0:9000"
+enable-event-processing: true
+
+genesis:
+  genesis-file-location: {{BINARY_PATH}}/genesis.blob
+
+authority-store-pruning-config:
+  num-latest-epoch-dbs-to-retain: 3
+  epoch-db-pruning-period-secs: 3600
+  num-epochs-to-retain: 1
+  max-checkpoints-in-batch: 200
+  max-transactions-in-batch: 1000
+  use-range-deletion: true
+  pruning-run-delay-seconds: 60
+
+p2p-config:
+  seed-peers:
+    - address: /dns/ewr-tnt-ssfn-00.testnet.sui.io/udp/8084
+      peer-id: df8a8d128051c249e224f95fcc463f518a0ebed8986bbdcc11ed751181fecd38
+    - address: /dns/lax-tnt-ssfn-00.testnet.sui.io/udp/8084
+      peer-id: f9a72a0a6c17eed09c27898eab389add704777c03e135846da2428f516a0c11d
+    - address: /dns/lhr-tnt-ssfn-00.testnet.sui.io/udp/8084
+      peer-id: 9393d6056bb9c9d8475a3cf3525c747257f17c6a698a7062cbbd1875bc6ef71e
+    - address: /dns/mel-tnt-ssfn-00.testnet.sui.io/udp/8084
+      peer-id: c88742f46e66a11cb8c84aca488065661401ef66f726cb9afeb8a5786d83456e

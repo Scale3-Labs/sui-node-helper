@@ -4,12 +4,12 @@ DEFAULT_BACKTITLE="Scale3Labs SUI Install Wizard"
 DEFAULT_FLAGS="--clear --no-cancel"
 
 # defaults
-SUI_RELEASE="testnet"   # can be github release tag, branch, or commit hash
+SUI_RELEASE="mainnet"   # can be github release tag, branch, or commit hash
 DEFAULT_BINARY_DIR="$(echo ~)/sui"
 SUI_RELEASE_OS="sui-node-ubuntu23"
-SUI_NETWORK="testnet"   # this can be either devnet or testnet
+SUI_NETWORK="testnet"   # this can be either mainnet, testnet or devnet
 NODE_TYPE="fullnode"    # this can be either fullnode or validator
-CONFIG_TEMPLATE_URL=""  # set to $FULLNODE_CONFIG_TEMPLATE_URL or $VALIDATOR_CONFIG_TEMPLATE_URL based on choice
+CONFIG_TEMPLATE_URL=""  # set to $FULLNODE_CONFIG_TEMPLATE_URL_PREFIX or $VALIDATOR_CONFIG_TEMPLATE_URL based on choice
 CONFIG_FILE_NAME=""     # set to 'fullnode.yaml' or 'validator.yaml' based on choice
 
 BINARY_NAME="sui-node"
@@ -18,13 +18,14 @@ CLI_NAME="sui"
 # to store temporary files
 TMP_FOLDER="/tmp/sui-node-helper"
 
+# MAINNET_GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/mainnet/genesis.blob"
+MAINNET_GENESIS_BLOB_URL="https://raw.githubusercontent.com/binary-comb/super-rotary-phone/main/genesis.blob"
 TESTNET_GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/testnet/genesis.blob"
 DEVNET_GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/devnet/genesis.blob"
-GENESIS_BLOB_URL="https://raw.githubusercontent.com/MystenLabs/sui-genesis/main/testnet/genesis.blob"
 SERVICE_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/sui-node.service"
 VALIDATOR_CONFIG_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/validator.yaml"
-CLIENT_CONFIG_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/client.yaml"
-FULLNODE_CONFIG_TEMPLATE_URL="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/fullnode.yaml"
+FULLNODE_CONFIG_TEMPLATE_URL_PREFIX="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master"
+CLIENT_CONFIG_URL_PREFIX="https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master"
 
 SUI_SERVICE_PATH="/etc/systemd/system/sui-node.service"
 CLIENT_CONFIG_PATH="$(echo ~)/.sui/sui_config/client.yaml"
@@ -115,8 +116,8 @@ function show_node_choices {
         --backtitle "$DEFAULT_BACKTITLE" \
         --title "Node Type" \
         --menu "Choose your choice of node:" 15 55 5 \
-            1 "Validator Node" \
-            2 "RPC Full Node" \
+            1 "RPC Full Node (most used)" \
+            2 "Validator Node" \
             3 "Exit" \
             2>&1 >/dev/tty)
 }
@@ -237,21 +238,32 @@ function select_network {
    choice=$(dialog $DEFAULT_FLAGS \
     --backtitle "$DEFAULT_BACKTITLE" \
     --title "Select Network" \
-    --menu "Setup FullNode for Network." 15 55 5 \
-        1 "Testnet" \
-        2 "Devnet" \
-        3 "Exit" \
+    --menu "Choose Network for which you want to run your node." 15 55 5 \
+        1 "Mainnet" \
+        2 "Testnet" \
+        3 "Devnet" \
+        4 "Exit" \
         2>&1 >/dev/tty)
-    
+
     case $choice in
-        1)  SUI_NETWORK="testnet"
-            GENESIS_BLOB_URL=$TESTNET_GENESIS_BLOB_URL
+        1)  SUI_NETWORK="mainnet"
+            GENESIS_BLOB_URL=$MAINNET_GENESIS_BLOB_URL
+            CLIENT_CONFIG_URL=$CLIENT_CONFIG_URL_PREFIX/mainnet-client.yaml
             ;;
-        2)  SUI_NETWORK="devnet"
+        2)  SUI_NETWORK="testnet"
+            GENESIS_BLOB_URL=$TESTNET_GENESIS_BLOB_URL
+            CLIENT_CONFIG_URL=$CLIENT_CONFIG_URL_PREFIX/testnet-client.yaml
+            ;;
+        3)  SUI_NETWORK="devnet"
             GENESIS_BLOB_URL=$DEVNET_GENESIS_BLOB_URL
             ;;
         *) setup_cancelled;;
     esac
+
+    # for validator node we use $VALIDATOR_CONFIG_TEMPLATE_URL
+    if [[ $NODE_TYPE == "fullnode" ]]; then
+        CONFIG_TEMPLATE_URL=$FULLNODE_CONFIG_TEMPLATE_URL_PREFIX/$SUI_NETWORK-fullnode.yaml
+    fi
 }
 
 function get_sui_release {
@@ -259,7 +271,7 @@ function get_sui_release {
         --backtitle "$DEFAULT_BACKTITLE" \
         --title "Download Binary & CLI" \
         --form "Enter release details: \n\nPress 'OK' to download:" 0 0 5 \
-        "Release version or hash:" 1 1 "testnet" 1 30 80 0 \
+        "Release version or hash:" 1 1 "mainnet" 1 30 80 0 \
         "Absolute folder for configs:" 2 1 "$DEFAULT_BINARY_DIR" 2 30 80 0 \
         2>&1 >/dev/tty)
 
@@ -272,6 +284,7 @@ function get_sui_release {
     DEFAULT_BINARY_DIR=$(echo "$binary_form" | tail -n 1)
     # Make sure the binary directory exists
     mkdir -p $DEFAULT_BINARY_DIR
+    sudo chown -R $USER $DEFAULT_BINARY_DIR 
     cd $DEFAULT_BINARY_DIR
 }
 
@@ -321,7 +334,7 @@ function initialize_validator_client {
     $DEFAULT_BINARY_DIR/$CLI_NAME --version
     $DEFAULT_BINARY_DIR/$CLI_NAME client -y
     # Patch client.yaml if testnet
-    if [[ $SUI_NETWORK == "testnet" ]]; then
+    if [[ $SUI_NETWORK == "testnet" ]] || [[ $SUI_NETWORK == "mainnet" ]]; then
         curl --fail --progress-bar $CLIENT_CONFIG_URL --output $TMP_FOLDER/client.yaml
         cat ~/.sui/sui_config/client.yaml | grep active_address >> $TMP_FOLDER/client.yaml
         sed -i "s|{{HOME_DIRECTORY}}|$(echo ~)|g;" $TMP_FOLDER/client.yaml
@@ -410,7 +423,7 @@ function setup_sui_service {
 
     curl -s $CONFIG_TEMPLATE_URL --output $DEFAULT_BINARY_DIR/$CONFIG_FILE_NAME
 
-    sed -i "s|{{BINARY_PATH}}|$DEFAULT_BINARY_DIR|g; s|{{DNS_NAME}}|$hostname|g; s|{{DATA_FOLDER}}|$data_folder_path|g" $DEFAULT_BINARY_DIR/$CONFIG_FILE_NAME
+    sed -i "s|{{BINARY_PATH}}|$DEFAULT_BINARY_DIR|g; s|{{DNS_NAME}}|$hostname|g; s|{{DATA_FOLDER}}|$data_folder_path|g; s|{{SUI_NETWORK}}|$SUI_NETWORK|g" $DEFAULT_BINARY_DIR/$CONFIG_FILE_NAME
     
     # requires root permissions
     sudo curl -s $SERVICE_TEMPLATE_URL --output $SUI_SERVICE_PATH
@@ -640,8 +653,8 @@ esac
 
 # STEP 2: Node Choice and Flow
 case $choice in
-    1) validator_flow_choice;;
-    2) fullnode_flow_choice;;
+    1) fullnode_flow_choice;;
+    2) validator_flow_choice;;
     3) setup_cancelled;;
     *) setup_cancelled;;
 esac
