@@ -53,7 +53,7 @@ authority-store-pruning-config:
   num-latest-epoch-dbs-to-retain: 3
   epoch-db-pruning-period-secs: 3600
   num-epochs-to-retain: 1
-  max-checkpoints-in-batch: 200
+  max-checkpoints-in-batch: 5
   max-transactions-in-batch: 1000
   use-range-deletion: true
 end-of-epoch-broadcast-channel-capacity: 128
@@ -65,4 +65,4 @@ db-checkpoint-config:
 indirect-objects-threshold: 18446744073709551615
 metrics:
   push-interval-seconds: 60
-  push-url: https://metrics-proxy.testnet.sui.io:8443/publish/metrics
+  push-url: https://metrics-proxy.{{SUI_NETWORK}}.sui.io:8443/publish/metrics

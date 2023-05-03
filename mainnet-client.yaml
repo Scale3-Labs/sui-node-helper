@@ -1,0 +1,11 @@
+---
+keystore:
+  File: {{HOME_DIRECTORY}}/.sui/sui_config/sui.keystore
+envs:
+  - alias: n1stake
+    rpc: "https://sui-rpc.mainnet.n1stake.com:443"
+    ws: ~
+  - alias: suiscan
+    rpc: "https://rpc-mainnet.suiscan.xyz:443"
+    ws: ~
+active_env: suiscan

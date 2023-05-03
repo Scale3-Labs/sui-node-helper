@@ -1,5 +1,3 @@
-# Copied from https://github.com/MystenLabs/sui/blob/main/crates/sui-config/data/fullnode-template.yaml
-# Update this value to the location you want Sui to store its database
 db-path: {{DATA_FOLDER}}/suidb
 
 network-address: "/dns/localhost/tcp/8080/http"
@@ -14,7 +12,7 @@ authority-store-pruning-config:
   num-latest-epoch-dbs-to-retain: 3
   epoch-db-pruning-period-secs: 3600
   num-epochs-to-retain: 1
-  max-checkpoints-in-batch: 200
+  max-checkpoints-in-batch: 10
   max-transactions-in-batch: 1000
   use-range-deletion: true
   pruning-run-delay-seconds: 60
