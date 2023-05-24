@@ -6,6 +6,8 @@ This GitHub repository contains a Bash script that automates the process of sett
 
 To use the helper script in this repository, simply download the script and run it on your system. The script will guide you through the process of setting up and updating your SUI blockchain node.
 
+<img width="857" alt="sui-node-helper-welcome" src="https://github.com/DSdatsme/sui-node-helper/assets/23118559/f07bac2e-4e0c-4eeb-9bc0-e9dd99ae66c0">
+
 ## Links
 
 Looking for **documentation**? check it out [here](https://scale3labs.com/docs/node-setup/sui-wizard/sui-wizard-introduction).
