@@ -1,4 +1,4 @@
-# SUI Node Helper
+# Sui Wizard: Your Node Management Simplified
 
 Welcome to the repository for the SUI blockchain node setup and update helper script!
 
@@ -6,12 +6,13 @@ This GitHub repository contains a Bash script that automates the process of sett
 
 To use the helper script in this repository, simply download the script and run it on your system. The script will guide you through the process of setting up and updating your SUI blockchain node.
 
-![image](https://user-images.githubusercontent.com/111706151/227618577-162c8aca-5a96-4fa9-a23b-93e4984d0e82.png)
+## Links
 
-![image](https://user-images.githubusercontent.com/111706151/227618895-87facdfe-02e3-406b-9c75-55ae0539c9e3.png)
+Looking for **documentation**? check it out [here](https://scale3labs.com/docs/node-setup/sui-wizard/sui-wizard-introduction).
 
-![image](https://user-images.githubusercontent.com/111706151/227619034-caf9a2b4-5d5c-4e60-a319-b1f75eeec0e2.png)
+If you are looking for a **follow along walkthrough**, check out our [blog](https://medium.com/@scale3/sui-wizard-node-management-simplified-b6a7395745e5) or our [livestream](https://www.youtube.com/live/aRDV1Rx_vaQ).
 
+FAQs for Sui Wizard [here](https://scale3labs.com/docs/node-setup/sui-wizard/sui-node-helper-faqs).
 
 ## Requirements
 
@@ -31,7 +32,7 @@ Running a validator requires mist on your validator address, so make sure you ha
 - SSH into the server where you want to set up the SUI node.
 - Download the `helper.sh` by running the following command on server.
   ```bash
-  curl --fail --location --output helper.sh https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/helper.sh 
+  curl --fail --location --output helper.sh https://raw.githubusercontent.com/Scale3-Labs/sui-node-helper/master/helper.sh
   ```
 - Give executable permissions to the script.
   ```bash
@@ -70,8 +71,6 @@ Works for sui node which is setup as systemd service with name `sui-node`.
   ```bash
   journalctl -fu sui-node
   ```
-
-
 
 Interested in setting up monitoring for your SUI node? Head on to [scale3labs.com](https://www.scale3labs.com/#autopilot).
 
